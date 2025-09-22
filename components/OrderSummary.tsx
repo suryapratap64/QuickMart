@@ -38,6 +38,7 @@ const OrderSummary = () => {
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [userAddresses, setUserAddresses] = useState<Address[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   const fetchUserAddresses = async () => {
     try {
@@ -64,100 +65,106 @@ const OrderSummary = () => {
     setSelectedAddress(address);
     setIsDropdownOpen(false);
   };
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") return resolve(false);
-    if (window.Razorpay) return resolve(true); // Already loaded
+  const loadRazorpayScript = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (typeof window === "undefined") return resolve(false);
+      if (window.Razorpay) return resolve(true); // Already loaded
 
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
-const createOrder = async () => {
-  try {
-    if (!selectedAddress) {
-      return toast.error("Please select an address");
-    }
-
-    let cartItemsArray: CartItem[] = Object.keys(cartItems).map((key) => ({
-      product: key,
-      quantity: cartItems[key],
-    })).filter((item) => item.quantity > 0);
-
-    if (cartItemsArray.length === 0) {
-      return toast.error("Cart is empty");
-    }
-
-    const token = await getToken();
-
-    // ✅ Step 1: Create order on backend
-    const { data } = await axios.post(
-      "/api/order/create",
-      {
-        address: selectedAddress, // or selectedAddress._id based on backend
-        items: cartItemsArray,
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` },
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+  const createOrder = async () => {
+    try {
+      setIsLoading(true);
+      if (!selectedAddress) {
+        setIsLoading(false);
+        return toast.error("Please select an address");
       }
-    );
 
-    if (!data.success) {
-      return toast.error(data.message || "Order creation failed");
+      let cartItemsArray: CartItem[] = Object.keys(cartItems)
+        .map((key) => ({
+          product: key,
+          quantity: cartItems[key],
+        }))
+        .filter((item) => item.quantity > 0);
+
+      if (cartItemsArray.length === 0) {
+        return toast.error("Cart is empty");
+      }
+
+      const token = await getToken();
+
+      // ✅ Step 1: Create order on backend
+      const { data } = await axios.post(
+        "/api/order/create",
+        {
+          address: selectedAddress, // or selectedAddress._id based on backend
+          items: cartItemsArray,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!data.success) {
+        return toast.error(data.message || "Order creation failed");
+      }
+
+      // ✅Step 2: Load Razorpay safely
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || typeof window.Razorpay === "undefined") {
+        return toast.error(
+          "Razorpay SDK failed to load. Please refresh and try again."
+        );
+      }
+      const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+
+      if (!razorpayKey) {
+        toast.error("Missing Razorpay public key");
+        return;
+      }
+
+      const options = {
+        key: razorpayKey, // ensure this is defined
+        amount: data.amount,
+        currency: data.currency,
+        name: "Your Store Name",
+        description: "Order Payment",
+        order_id: data.orderId,
+        handler: async function (response: any) {
+          toast.success("Payment Successful 🎉");
+
+          await axios.post("/api/order/verify", {
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+
+          setCartItems({});
+          router.push("/order-placed");
+        },
+        prefill: {
+          name: selectedAddress.fullName,
+          contact: selectedAddress.phoneNumber,
+        },
+        theme: {
+          color: "#F37254",
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      console.error(error);
+      toast.error("Payment process failed.");
+    } finally {
+      setIsLoading(false);
     }
-
-    // ✅Step 2: Load Razorpay safely
-    const isLoaded = await loadRazorpayScript();
-    if (!isLoaded || typeof window.Razorpay === "undefined") {
-      return toast.error("Razorpay SDK failed to load. Please refresh and try again.");
-    }
-    const razorpayKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-
-if (!razorpayKey) {
-  toast.error("Missing Razorpay public key");
-  return;
-}
-
-    const options = {
-      key:razorpayKey, // ensure this is defined
-      amount: data.amount,
-      currency: data.currency,
-      name: "Your Store Name",
-      description: "Order Payment",
-      order_id: data.orderId,
-      handler: async function (response: any) {
-        toast.success("Payment Successful 🎉");
-
-        // await axios.post("/api/order/verify", {
-        //   razorpay_order_id: response.razorpay_order_id,
-        //   razorpay_payment_id: response.razorpay_payment_id,
-        //   razorpay_signature: response.razorpay_signature,
-        // });
-
-        setCartItems({});
-        router.push("/order-placed");
-      },
-      prefill: {
-        name: selectedAddress.fullName,
-        contact: selectedAddress.phoneNumber,
-      },
-      theme: {
-        color: "#F37254",
-      },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  } catch (error) {
-    console.error(error);
-    toast.error("Payment process failed.");
-  }
-};
-
-
+  };
 
   // const createOrder = async () => {
   //   try {
@@ -315,9 +322,21 @@ if (!razorpayKey) {
 
       <button
         onClick={createOrder}
-        className="w-full bg-orange-600 text-white py-3 mt-5 hover:bg-orange-700"
+        disabled={isLoading}
+        className={`w-full bg-orange-600 text-white py-3 mt-5 hover:bg-orange-700 relative ${
+          isLoading ? "opacity-70 cursor-not-allowed" : ""
+        }`}
       >
-        Place Order
+        {isLoading ? (
+          <>
+            <span className="opacity-0">Place Order</span>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          </>
+        ) : (
+          "Place Order"
+        )}
       </button>
     </div>
   );
