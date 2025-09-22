@@ -12,7 +12,7 @@ interface OrderItem {
 
 const key_id = process.env.RAZORPAY_KEY_ID;
 const key_secret = process.env.RAZORPAY_SECRET_ID;
-console.log("RAZORPAY_KEY_ID:", process.env.RAZORPAY_KEY_ID);
+
 
 if (!key_id || !key_secret) {
   throw new Error("Missing Razorpay environment variables");
@@ -62,11 +62,11 @@ export async function POST(request: NextRequest) {
     }
   
 
-    const totalAmount = amount + Math.floor(amount * 0.02); // add 2% fee
+    const totalAmount = (amount + Math.floor(amount * 0.02)) ; // add 2% fee
 
     // Create Razorpay Order
     const order = await razorpay.orders.create({
-      amount: totalAmount * 100, // paise
+      amount: totalAmount *100 * 85 , // paise
       currency: "INR",
       receipt: `receipt_order_${Date.now()}`,
       payment_capture: true,
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         userId,
         address,
         items,
-        amount: totalAmount,
+        amount: totalAmount  ,
         date: Date.now(),
         razorpayOrderId: order.id,
       },
@@ -91,7 +91,12 @@ export async function POST(request: NextRequest) {
       await user.save();
     }
 
-    return NextResponse.json({ success: true, message: "Order placed" });
+    return NextResponse.json({ 
+     success: true,
+      orderId: order.id,
+      amount: order.amount, // in paise
+      currency: order.currency,
+      message: "Order created successfully", });
   } catch (error: unknown) {
     console.error("Order error:", error);
     return NextResponse.json(

@@ -6,13 +6,13 @@ import { assets } from "@/assets/assets";
 const products = [
   {
     id: 1,
-    image: assets.back_1,
+    image: assets.back_3,
     title: "Rich & Refined",
     description: "Indulge in the bold flavor of our premium red wines.",
   },
   {
     id: 2,
-    image: assets.back_2,
+    image: assets.back_3,
     title: "Crisp & Elegant",
     description: "Discover the smooth taste of handcrafted white wines.",
   },

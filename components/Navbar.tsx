@@ -9,7 +9,7 @@ import { useClerk, UserButton } from "@clerk/nextjs";
 const Navbar = () => {
   const { isSeller, router, user } = useAppContext();
   const { openSignIn } = useClerk();
-    const handleSignIn = () => {
+  const handleSignIn = () => {
     if (!user) {
       openSignIn();
     } else {
@@ -25,7 +25,14 @@ const Navbar = () => {
         src={assets.logo}
         alt="logo"
       /> */}
-      <h1   onClick={() => router.push("/")}  className="cursor-pointer text-orange-600 text-2xl font-serif  w-28 md:w-32">QuickMart</h1>
+      <h1
+        onClick={() => {
+          window.location.href = "/"; // This will cause a full page refresh
+        }}
+        className="cursor-pointer text-orange-600 text-2xl font-serif  w-28 md:w-32"
+      >
+        QuickMart
+      </h1>
       <div className="flex items-center gap-4 lg:gap-8 max-md:hidden">
         <Link href="/" className="hover:text-gray-900 transition">
           Home
@@ -49,15 +56,14 @@ const Navbar = () => {
           </button>
         )} */}
 
-      {/* Allow for all that they see the feature; */}
-     
-          <button
-            onClick={() => router.push("/seller")}
-            className="text-xs border cursor-pointer px-4 py-1.5 rounded-full"
-          >
-            Seller Dashboard
-          </button>
-      
+        {/* Allow for all that they see the feature; */}
+
+        <button
+          onClick={() => router.push("/seller")}
+          className="text-xs border cursor-pointer px-4 py-1.5 rounded-full"
+        >
+          Seller Dashboard
+        </button>
       </div>
 
       <ul className="hidden md:flex items-center gap-4 ">
